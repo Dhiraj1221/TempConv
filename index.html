@@ -1,27 +1,273 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-     <link rel="shorcut icon" type="x-icon" href="logo2.png">
-     <meta charset="UTF-8">
-     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-     <title>Temprature Converter</title>
-     <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Trading Outcome Calculator</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --accent:#6ee7b7; --muted:#94a3b8;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;color:#e6eef8;background:linear-gradient(180deg,#071028 0%, #071428 40%, #071825 100%)}
+    .wrap{max-width:980px;margin:32px auto;padding:24px;background:linear-gradient(180deg,var(--card), rgba(9,13,20,0.9));border-radius:14px;box-shadow:0 10px 40px rgba(2,6,23,0.7);border:1px solid rgba(255,255,255,0.03);}
+    header{display:flex;align-items:center;gap:16px}
+    header h1{font-size:20px;margin:0}
+    header p{margin:0;color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:1fr 380px;gap:18px;margin-top:18px}
+    .controls{padding:18px;background:rgba(255,255,255,0.02);border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    label{display:block;font-size:13px;margin-bottom:8px;color:var(--muted)}
+    input[type="number"], textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:15px}
+    textarea{min-height:120px;resize:vertical}
+    .row{display:flex;gap:10px;margin-top:12px}
+    button{background:linear-gradient(90deg,var(--accent),#34d399);border:0;color:#062018;padding:10px 12px;border-radius:10px;font-weight:700;cursor:pointer}
+    button.secondary{background:transparent;color:var(--accent);border:1px solid rgba(110,231,183,0.12)}
+    .result-card{padding:18px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    .summary{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .stat{padding:12px;border-radius:8px;background:rgba(0,0,0,0.15);min-width:140px}
+    .stat strong{display:block;font-size:18px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.03);font-size:14px}
+    th{color:var(--muted);font-weight:600}
+    .pos{color:#7ef3c3}
+    .neg{color:#ff9aa2}
+    .chart-wrap{margin-top:12px;background:linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));padding:12px;border-radius:8px}
+    /* responsive canvas: CSS controls size; JS sets pixel buffer to match */
+    .chart-wrap canvas{width:100%;height:220px;display:block;border-radius:6px;background:transparent}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr;}.wrap{margin:12px}}
+  </style>
 </head>
 <body>
-     <form>
-     <h1>Temprature Conversion:</h1>
+  <div class="wrap">
+    <header>
+      <div style="width:54px;height:54px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#60a5fa);display:flex;align-items:center;justify-content:center;font-weight:800;color:#05201a">TC</div>
+      <div>
+        <h1>Trading Outcome Calculator</h1>
+        <p>Initial amount + percent outcomes → step-by-step compounding + responsive chart.</p>
+      </div>
+    </header>
 
-     <input type="text"  id="textBox" value="">
-     <br>
-     <input type="radio" name="unit" id="toFahrenheit">
-     <label for="toFahrenheit">Celcius ➡️ Fahrenheit</label><br>
+    <div class="grid">
+      <div class="controls">
+        <label>Initial amount</label>
+        <input id="initial" type="number" value="1000" min="0" step="0.01" />
 
-     <input type="radio" name="unit" id="toCelcius">
-     <label for="toCelcius">Fahrenheit ➡️ Celcius</label><br>
+        <label style="margin-top:12px">Percent outcomes (space or comma separated)</label>
+        <textarea id="pnl">15 5 -35 -35 -35</textarea>
 
-     <button type="button" onclick="convert()">Submit</button>
-     <p id="result"></p>
-     <script src="index.js"></script>
-</form>
+        <div class="row">
+          <button id="calcBtn">Calculate</button>
+          <button id="resetBtn" class="secondary">Reset</button>
+          <button id="exampleBtn" class="secondary">Example: 40 50 7</button>
+        </div>
+
+        <div style="margin-top:12px;color:var(--muted);font-size:13px">Pro tip: use negative numbers for losses; decimals allowed.</div>
+      </div>
+
+      <div class="result-card">
+        <div class="summary">
+          <div class="stat">
+            <div style="color:var(--muted);font-size:13px">Final amount</div>
+            <strong id="finalAmt">-</strong>
+            <div style="font-size:12px;color:var(--muted)" id="finalPerc">-</div>
+          </div>
+
+          <div class="stat">
+            <div style="color:var(--muted);font-size:13px">Total profit / loss</div>
+            <strong id="profit">-</strong>
+            <div style="font-size:12px;color:var(--muted)" id="profitPerc">-</div>
+          </div>
+
+          <div class="stat">
+            <div style="color:var(--muted);font-size:13px">Trades</div>
+            <strong id="trades">0</strong>
+            <div style="font-size:12px;color:var(--muted)">Step-by-step below</div>
+          </div>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="chart"></canvas>
+        </div>
+
+        <div style="margin-top:12px;overflow:auto;max-height:260px">
+          <table id="stepsTable">
+            <thead><tr><th>#</th><th>Percent</th><th>Amount Before</th><th>Amount After</th><th>Change</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <footer>Built with plain HTML/CSS/JS</footer>
+  </div>
+
+  <script>
+    // small helper
+    const $ = id => document.getElementById(id);
+
+    const calcBtn = $('calcBtn');
+    const resetBtn = $('resetBtn');
+    const exampleBtn = $('exampleBtn');
+    const initial = $('initial');
+    const pnl = $('pnl');
+    const finalAmt = $('finalAmt');
+    const profit = $('profit');
+    const trades = $('trades');
+    const finalPerc = $('finalPerc');
+    const profitPerc = $('profitPerc');
+    const stepsTable = document.querySelector('#stepsTable tbody');
+
+    const chart = document.getElementById('chart');
+    const ctx = chart.getContext('2d');
+
+    // keep last drawn points so we can redraw on resize
+    let lastPoints = [];
+
+    function parsePNL(text){
+      if(!text) return [];
+      return text.trim().split(/[\s,]+/).map(s => parseFloat(s)).filter(n => !Number.isNaN(n));
+    }
+
+    function nice(n){ return Number.isFinite(n) ? n.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:6}) : '-'; }
+
+    // Resize canvas pixel buffer to match CSS size * devicePixelRatio
+    function resizeCanvas(){
+      const DPR = window.devicePixelRatio || 1;
+      const rect = chart.getBoundingClientRect();
+      // prevent zero sizes
+      const cssW = Math.max(50, Math.floor(rect.width));
+      const cssH = Math.max(50, Math.floor(rect.height));
+      chart.width = Math.floor(cssW * DPR);
+      chart.height = Math.floor(cssH * DPR);
+      // map drawing operations to CSS pixels for easier math
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      // clear in CSS pixel coordinates
+      ctx.clearRect(0, 0, cssW, cssH);
+    }
+
+    function drawChart(points){
+      lastPoints = points.slice();
+      resizeCanvas();
+
+      // use CSS pixels for coordinates (because of setTransform above)
+      const cssW = chart.width / (window.devicePixelRatio || 1);
+      const cssH = chart.height / (window.devicePixelRatio || 1);
+
+      if(points.length === 0){
+        // nothing to draw
+        return;
+      }
+
+      const pad = 24;
+      const min = Math.min(...points);
+      const max = Math.max(...points);
+      const range = (max - min) || (Math.abs(max) || 1);
+
+      // background grid lines
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      for(let i=0; i<4; i++){
+        const y = pad + i * ( (cssH - 2*pad) / 3 );
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(cssW - pad, y);
+        ctx.stroke();
+      }
+
+      // line path
+      ctx.beginPath();
+      points.forEach((val, i) => {
+        const x = pad + (i / (points.length - 1 || 1)) * (cssW - 2*pad);
+        const y = pad + (1 - (val - min) / range) * (cssH - 2*pad);
+        if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = 'rgba(110,231,183,0.95)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // draw dots
+      points.forEach((val, i) => {
+        const x = pad + (i / (points.length - 1 || 1)) * (cssW - 2*pad);
+        const y = pad + (1 - (val - min) / range) * (cssH - 2*pad);
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(110,231,183,0.95)';
+        ctx.fill();
+      });
+    }
+
+    function calculate(){
+      stepsTable.innerHTML = '';
+      const start = parseFloat(initial.value) || 0;
+      const arr = parsePNL(pnl.value);
+      let amt = start;
+      const points = [amt];
+
+      arr.forEach((p, idx) => {
+        const before = amt;
+        const delta = before * (p / 100);
+        const after = before + delta;
+        amt = after;
+        points.push(amt);
+
+        const tr = document.createElement('tr');
+        const changeClass = delta >= 0 ? 'pos' : 'neg';
+        tr.innerHTML = `<td>${idx+1}</td><td>${p}%</td><td>${nice(before)}</td><td>${nice(after)}</td><td class="${changeClass}">${delta>=0?'+':''}${nice(delta)}</td>`;
+        stepsTable.appendChild(tr);
+      });
+
+      finalAmt.textContent = nice(amt);
+      trades.textContent = arr.length;
+      const totalDelta = amt - start;
+      profit.textContent = (totalDelta>=0?'+':'') + nice(totalDelta);
+      profitPerc.textContent = (start === 0 ? '-' : ((totalDelta / start) * 100).toFixed(2) + '%');
+      finalPerc.textContent = (start === 0 ? '-' : ((amt / start - 1) * 100).toFixed(2) + '%');
+
+      drawChart(points);
+    }
+
+    // debounced resize handler
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      if(resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        // redraw using lastPoints
+        drawChart(lastPoints);
+      }, 120);
+    });
+
+    calcBtn.addEventListener('click', () => {
+      calculate();
+      // micro animation
+      calcBtn.animate([{transform:'scale(0.98)'},{transform:'scale(1)'}], {duration:140});
+    });
+
+    resetBtn.addEventListener('click', () => {
+      initial.value = '1000';
+      pnl.value = '15 5 -35 -35 -35';
+      stepsTable.innerHTML = '';
+      finalAmt.textContent = '-';
+      profit.textContent = '-';
+      trades.textContent = '0';
+      finalPerc.textContent = '-';
+      profitPerc.textContent = '-';
+      lastPoints = [];
+      // clear drawing
+      resizeCanvas();
+    });
+
+    exampleBtn.addEventListener('click', () => {
+      pnl.value = '40 50 7';
+      calculate();
+    });
+
+    // initial run after DOM loaded
+    window.addEventListener('load', () => {
+      // force a canvas resize and initial draw
+      resizeCanvas();
+      calculate();
+    });
+  </script>
 </body>
 </html>
